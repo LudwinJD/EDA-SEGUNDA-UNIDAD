@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador Avanzado de ABB Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Roboto+Mono&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f4f8;
+            color: #2c3e50;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: #34495e;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-family: 'Roboto', sans-serif;
+            color: #ecf0f1;
+            margin: 0;
+            font-size: 2em;
+            letter-spacing: 1px;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .panel {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .visualization {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        input,
+        button,
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            background-color: #ecf0f1;
+            color: #2c3e50;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        button {
+            background-color: #3498db;
+            color: #ffffff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        textarea {
+            resize: none;
+            height: 100px;
+        }
+
+        #treeCanvas {
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #stats {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        #output-area {
+            background-color: #ecf0f1;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        #output-area::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #output-area::-webkit-scrollbar-track {
+            background: #ecf0f1;
+        }
+
+        #output-area::-webkit-scrollbar-thumb {
+            background: #95a5a6;
+            border-radius: 4px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-buttons button {
+            flex: 1;
+        }
+
+        #speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #speed-slider {
+            flex-grow: 1;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        #node-details {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        #zoom-controls {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        #zoom-controls button {
+            padding: 5px 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>Visualizador Avanzado de Árbol Binario de Búsqueda Pro</h1>
+    </div>
+    <div class="container">
+        <div class="panel controls">
+            <input type="number" id="numGenerar" value="15" min="1" max="50" placeholder="Nodos (1-50)">
+            <button id="btnGenerar">Generar Árbol</button>
+            <div class="action-buttons">
+                <input type="number" id="numInsertar" placeholder="Insertar">
+                <button id="btnInsertar">Insertar</button>
+            </div>
+            <div class="action-buttons">
+                <input type="number" id="numEliminar" placeholder="Eliminar">
+                <button id="btnEliminar">Eliminar</button>
+            </div>
+            <div class="action-buttons">
+                <input type="number" id="numBuscar" placeholder="Buscar">
+                <button id="btnBuscar">Buscar</button>
+            </div>
+            <select id="traversalSelect">
+                <option value="preorder">Preorden</option>
+                <option value="inorder">Inorden</option>
+                <option value="postorder">Postorden</option>
+                <option value="levelorder">Por niveles</option>
+            </select>
+            <button id="btnAnimateTraversal">Animar Recorrido</button>
+            <button id="btnLimpiar">Limpiar Árbol</button>
+            <button id="btnBalance">Balancear Árbol</button>
+            <div id="speed-control">
+                <label for="speed-slider">Velocidad:</label>
+                <input type="range" id="speed-slider" min="1" max="5" value="3">
+            </div>
+            <textarea id="numerosGenerados" readonly placeholder="Números generados"></textarea>
+            <textarea id="recorridos" readonly placeholder="Recorridos"></textarea>
+            <div id="output-area"></div>
+        </div>
+        <div class="panel visualization">
+            <div id="treeCanvas"></div>
+            <div id="stats"></div>
+            <div id="node-details"></div>
+            <div id="zoom-controls">
+                <button id="zoomIn">+</button>
+                <button id="zoomOut">-</button>
+                <button id="resetZoom">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notificationModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle"></h2>
+            <p id="modalMessage"></p>
+        </div>
+    </div>
+
+    <script>
+        let root = null;
+        let numbers = [];
+        let searchPath = [];
+        let currentTraversal = [];
+        let animationStep = 0;
+        let numberToSearch = -1;
+        let animationInterval = null;
+        let animationSpeed = 3;
+        let selectedNode = null;
+        let zoomLevel = 1;
+        let panX = 0;
+        let panY = 0;
+
+        class Node {
+            constructor(value) {
+                this.value = value;
+                this.left = null;
+                this.right = null;
+                this.parent = null;
+                this.x = 0;
+                this.y = 0;
+                this.targetX = 0;
+                this.targetY = 0;
+                this.color = color(52, 152, 219);
+                this.size = 40;
+                this.highlighted = false;
+                this.depth = 0;
+            }
+        }
+
+        function setup() {
+            let canvas = createCanvas(800, 600);
+            canvas.parent('treeCanvas');
+            textAlign(CENTER, CENTER);
+            frameRate(60);
+        }
+
+        function draw() {
+            background(240, 244, 248);
+
+            // Calcular el centro del canvas
+            let centerX = width / 2;
+            let centerY = height / 2;
+
+            // Aplicar transformaciones
+            translate(centerX + panX, centerY + panY);
+            scale(zoomLevel);
+            translate(-centerX, -centerY);
+
+            if (root) {
+                calculateNodePositions(root);
+                drawConnections(root);
+                drawNodes(root);
+            }
+        }
+
+        function calculateNodePositions(node) {
+            if (!node) return;
+
+            const treeHeight = getTreeHeight(root);
+            const levelWidth = width / (Math.pow(2, node.depth) + 1);
+            const ySpacing = height / (treeHeight + 1);
+
+            if (!node.parent) {
+                node.targetX = width / 2;
+                node.targetY = ySpacing;
+            } else {
+                const direction = node.parent.left === node ? -1 : 1;
+                const horizontalSpacing = levelWidth / 2;
+                node.targetX = node.parent.x + direction * horizontalSpacing;
+                node.targetY = node.parent.y + ySpacing;
+            }
+
+            node.x = lerp(node.x, node.targetX, 0.1);
+            node.y = lerp(node.y, node.targetY, 0.1);
+
+            calculateNodePositions(node.left);
+            calculateNodePositions(node.right);
+        }
+
+        function drawConnections(node) {
+            if (!node) return;
+
+            stroke(189, 195, 199);
+            strokeWeight(2);
+
+            if (node.left) {
+                line(node.x, node.y, node.left.x, node.left.y);
+            }
+            if (node.right) {
+                line(node.x, node.y, node.right.x, node.right.y);
+            }
+
+            drawConnections(node.left);
+            drawConnections(node.right);
+        }
+
+        function drawNodes(node) {
+            if (!node) return;
+
+            noStroke();
+            fill(node.color);
+            if (node.highlighted) {
+                fill(255, 204, 0);
+            }
+            if (node === selectedNode) {
+                stroke(255, 0, 0);
+                strokeWeight(3);
+            }
+            ellipse(node.x, node.y, node.size, node.size);
+
+            fill(255);
+            noStroke();
+            textSize(16);
+            text(node.value, node.x, node.y);
+
+            drawNodes(node.left);
+            drawNodes(node.right);
+        }
+
+        async function generateRandomNumbers() {
+            const count = parseInt(document.getElementById('numGenerar').value);
+            if (isNaN(count) || count < 1 || count > 50) {
+                showNotification("Entrada inválida", "Por favor, ingrese un número entre 1 y 50.");
+                return;
+            }
+
+            numbers = [];
+            root = null;
+            while (numbers.length < count) {
+                const num = Math.floor(Math.random() * 100) + 1;
+                if (!numbers.includes(num)) {
+                    numbers.push(num);
+                    await insertNode(num);
+                }
+            }
+
+            document.getElementById('numerosGenerados').value = numbers.join(', ');
+            updateTraversals();
+            updateStats();
+            showNotification("Árbol Generado", `Se ha generado un nuevo ABB con ${count} nodos.`);
+        }
+
+        async function insertNode(value) {
+            if (root === null) {
+                root = new Node(value);
+                root.depth = 0;
+            } else {
+                await animateInsertion(value);
+            }
+        }
+
+        async function animateInsertion(value) {
+            let currentNode = root;
+            let path = [];
+            while (true) {
+                path.push(currentNode);
+                highlightNode(currentNode, 'comparing');
+                await new Promise(resolve => setTimeout(resolve, 500 / animationSpeed));
+
+                if (value < currentNode.value) {
+                    appendToOutput(`${value} < ${currentNode.value}, yendo a la izquierda`);
+                    if (currentNode.left === null) {
+                        currentNode.left = new Node(value);
+                        currentNode.left.parent = currentNode;
+                        currentNode.left.depth = currentNode.depth + 1;
+                        path.push(currentNode.left);
+                        highlightNode(currentNode.left, 'inserted');
+                        showNotification("Nodo Insertado", `El valor ${value} ha sido insertado en el árbol.`, path);
+                        break;
+                    }
+                    currentNode = currentNode.left;
+                } else {
+                    appendToOutput(`${value} > ${currentNode.value}, yendo a la derecha`);
+                    if (currentNode.right === null) {
+                        currentNode.right = new Node(value);
+                        currentNode.right.parent = currentNode;
+                        currentNode.right.depth = currentNode.depth + 1;
+                        path.push(currentNode.right);
+                        highlightNode(currentNode.right, 'inserted');
+                        showNotification("Nodo Insertado", `El valor ${value} ha sido insertado en el árbol.`, path);
+                        break;
+                    }
+                    currentNode = currentNode.right;
+                }
+            }
+            updateTraversals();
+            updateStats();
+        }
+
+        async function animateDeletion(value) {
+            let currentNode = root;
+            let parent = null;
+            let found = false;
+            let path = [];
+
+            while (currentNode && !found) {
+                path.push(currentNode);
+                highlightNode(currentNode, 'comparing');
+                await new Promise(resolve => setTimeout(resolve, 500 / animationSpeed));
+
+                if (value < currentNode.value) {
+                    appendToOutput(`${value} < ${currentNode.value}, yendo a la izquierda`);
+                    parent = currentNode;
+                    currentNode = currentNode.left;
+                } else if (value > currentNode.value) {
+                    appendToOutput(`${value} > ${currentNode.value}, yendo a la derecha`);
+                    parent = currentNode;
+                    currentNode = currentNode.right;
+                } else {
+                    found = true;
+                }
+            }
+
+            if (!found) {
+                showNotification("Nodo no encontrado", `El valor ${value} no se encontró en el árbol.`, path);
+                return;
+            }
+
+            // Nodo con un hijo o sin hijos
+            if (currentNode.left === null) {
+                if (parent === null) {
+                    root = currentNode.right;
+                    if (root) root.parent = null;
+                } else if (parent.left === currentNode) {
+                    parent.left = currentNode.right;
+                    if (currentNode.right) currentNode.right.parent = parent;
+                } else {
+                    parent.right = currentNode.right;
+                    if (currentNode.right) currentNode.right.parent = parent;
+                }
+            } else if (currentNode.right === null) {
+                if (parent === null) {
+                    root = currentNode.left;
+                    if (root) root.parent = null;
+                } else if (parent.left === currentNode) {
+                    parent.left = currentNode.left;
+                    if (currentNode.left) currentNode.left.parent = parent;
+                } else {
+                    parent.right = currentNode.left;
+                    if (currentNode.left) currentNode.left.parent = parent;
+                }
+            } else {
+                // Nodo con dos hijos
+                let successor = findMinNode(currentNode.right);
+                let successorValue = successor.value;
+                await animateDeletion(successorValue);
+                currentNode.value = successorValue;
+            }
+
+            highlightNode(currentNode, 'deleted');
+            showNotification("Nodo Eliminado", `El valor ${value} ha sido eliminado del árbol.`, path);
+            updateTraversals();
+            updateStats();
+        }
+
+        function findMinNode(node) {
+            while (node.left !== null) {
+                node = node.left;
+            }
+            return node;
+        }
+
+        function highlightNode(node, state) {
+            switch (state) {
+                case 'comparing':
+                    node.color = color(255, 165, 0);
+                    break;
+                case 'inserted':
+                    node.color = color(46, 204, 113);
+                    break;
+                case 'deleted':
+                    node.color = color(231, 76, 60);
+                    break;
+                default:
+                    node.color = color(52, 152, 219);
+            }
+            gsap.to(node, { size: 60, duration: 0.5 / animationSpeed, yoyo: true, repeat: 1 });
+        }
+
+        async function searchInTree(node, value, path = []) {
+            if (node === null) {
+                showNotification("Nodo no encontrado", `El valor ${value} no se encontró en el árbol.`, path);
+                return false;
+            }
+
+            path.push(node);
+            highlightNode(node, 'comparing');
+            await new Promise(resolve => setTimeout(resolve, 500 / animationSpeed));
+
+            if (node.value === value) {
+                highlightNode(node, 'inserted');
+                showNotification("Nodo encontrado", `El valor ${value} se encontró en el árbol.`, path);
+                return true;
+            } else if (value < node.value) {
+                appendToOutput(`${value} < ${node.value}, yendo a la izquierda`);
+                return searchInTree(node.left, value, path);
+            } else {
+                appendToOutput(`${value} > ${node.value}, yendo a la derecha`);
+                return searchInTree(node.right, value, path);
+            }
+        }
+
+        function preorder(node, result = []) {
+            if (node === null) return;
+            result.push(node.value);
+            preorder(node.left, result);
+            preorder(node.right, result);
+            return result;
+        }
+
+        function inorder(node, result = []) {
+            if (node === null) return;
+            inorder(node.left, result);
+            result.push(node.value);
+            inorder(node.right, result);
+            return result;
+        }
+
+        function postorder(node, result = []) {
+            if (node === null) return;
+            postorder(node.left, result);
+            postorder(node.right, result);
+            result.push(node.value);
+            return result;
+        }
+
+        function levelorder(node) {
+            if (!node) return [];
+            let result = [];
+            let queue = [node];
+            while (queue.length > 0) {
+                let levelSize = queue.length;
+                let currentLevel = [];
+                for (let i = 0; i < levelSize; i++) {
+                    let currentNode = queue.shift();
+                    currentLevel.push(currentNode.value);
+                    if (currentNode.left) queue.push(currentNode.left);
+                    if (currentNode.right) queue.push(currentNode.right);
+                }
+                result.push(...currentLevel);
+            }
+            return result;
+        }
+
+        function updateTraversals() {
+            const pre = preorder(root);
+            const ino = inorder(root);
+            const post = postorder(root);
+            const level = levelorder(root);
+            document.getElementById('recorridos').value =
+                `Preorden: ${pre.join(', ')}
+Inorden: ${ino.join(', ')}
+Postorden: ${post.join(', ')}
+Por niveles: ${level.join(', ')}`;
+        }
+
+        async function animateTraversal() {
+            const traversalType = document.getElementById('traversalSelect').value;
+            let traversalFunc;
+            switch (traversalType) {
+                case 'preorder':
+                    traversalFunc = preorder;
+                    break;
+                case 'inorder':
+                    traversalFunc = inorder;
+                    break;
+                case 'postorder':
+                    traversalFunc = postorder;
+                    break;
+                case 'levelorder':
+                    traversalFunc = levelorder;
+                    break;
+            }
+
+            currentTraversal = traversalFunc(root);
+            for (let i = 0; i < currentTraversal.length; i++) {
+                await highlightTraversalNode(root, currentTraversal[i]);
+                appendToOutput(`Recorrido ${traversalType}: ${currentTraversal.slice(0, i + 1).join(', ')}`);
+                await new Promise(resolve => setTimeout(resolve, 1000 / animationSpeed));
+            }
+            showNotification("Recorrido Completo", `El recorrido ${traversalType} ha sido completado.`);
+        }
+
+        async function highlightTraversalNode(node, value) {
+            if (!node) return;
+            if (node.value === value) {
+                node.highlighted = true;
+                gsap.to(node, { size: 60, duration: 0.5 / animationSpeed, yoyo: true, repeat: 1 });
+                await new Promise(resolve => setTimeout(resolve, 500 / animationSpeed));
+                node.highlighted = false;
+                return;
+            }
+            await highlightTraversalNode(node.left, value);
+            await highlightTraversalNode(node.right, value);
+        }
+
+        function updateStats() {
+            const height = getTreeHeight(root);
+            const nodeCount = getNodeCount(root);
+            const leafCount = getLeafCount(root);
+            const isBalanced = checkBalanced(root);
+            document.getElementById('stats').innerHTML = `
+                Altura: ${height}<br>
+                Nodos: ${nodeCount}<br>
+                Hojas: ${leafCount}<br>
+                Balanceado: ${isBalanced ? 'Sí' : 'No'}
+            `;
+        }
+
+        function getTreeHeight(node) {
+            if (!node) return 0;
+            return 1 + Math.max(getTreeHeight(node.left), getTreeHeight(node.right));
+        }
+
+        function getNodeCount(node) {
+            if (!node) return 0;
+            return 1 + getNodeCount(node.left) + getNodeCount(node.right);
+        }
+
+        function getLeafCount(node) {
+            if (!node) return 0;
+            if (!node.left && !node.right) return 1;
+            return getLeafCount(node.left) + getLeafCount(node.right);
+        }
+
+        function checkBalanced(node) {
+            if (!node) return true;
+
+            let leftHeight = getTreeHeight(node.left);
+            let rightHeight = getTreeHeight(node.right);
+
+            if (Math.abs(leftHeight - rightHeight) <= 1 &&
+                checkBalanced(node.left) &&
+                checkBalanced(node.right)) {
+                return true;
+            }
+
+            return false;
+        }
+
+        function appendToOutput(message) {
+            const outputArea = document.getElementById('output-area');
+            outputArea.innerHTML += `${message}<br>`;
+            outputArea.scrollTop = outputArea.scrollHeight;
+        }
+
+        function balanceTree() {
+            const nodes = inorder(root);
+            root = buildBalancedBST(nodes, 0, nodes.length - 1, 0);
+            updateTreeDepths(root);
+            updateTraversals();
+            updateStats();
+            showNotification("Árbol Balanceado", "El Árbol Binario de Búsqueda ha sido balanceado.");
+        }
+
+        function updateTreeDepths(node, depth = 0) {
+            if (!node) return;
+            node.depth = depth;
+            updateTreeDepths(node.left, depth + 1);
+            updateTreeDepths(node.right, depth + 1);
+        }
+
+        function buildBalancedBST(nodes, start, end, depth = 0) {
+            if (start > end) return null;
+
+            let mid = Math.floor((start + end) / 2);
+            let node = new Node(nodes[mid]);
+            node.depth = depth;
+
+            node.left = buildBalancedBST(nodes, start, mid - 1, depth + 1);
+            if (node.left) node.left.parent = node;
+            node.right = buildBalancedBST(nodes, mid + 1, end, depth + 1);
+            if (node.right) node.right.parent = node;
+
+            return node;
+        }
+
+        function showNotification(title, message, path = []) {
+            const modal = document.getElementById('notificationModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalMessage = document.getElementById('modalMessage');
+            const span = document.getElementsByClassName("close")[0];
+
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            if (path.length > 0) {
+                modalMessage.textContent += ` Camino: ${path.map(node => node.value).join(' -> ')}`;
+            }
+            modal.style.display = "block";
+
+            span.onclick = function () {
+                modal.style.display = "none";
+            }
+
+            window.onclick = function (event) {
+                if (event.target == modal) {
+                    modal.style.display = "none";
+                }
+            }
+
+            setTimeout(() => {
+                modal.style.display = "none";
+            }, 3000);
+        }
+
+        function showNodeDetails(node) {
+            if (!node) {
+                document.getElementById('node-details').innerHTML = '';
+                return;
+            }
+
+            let details = `
+                Valor: ${node.value}<br>
+                Padre: ${node.parent ? node.parent.value : 'Ninguno'}<br>
+                Hijo izquierdo: ${node.left ? node.left.value : 'Ninguno'}<br>
+                Hijo derecho: ${node.right ? node.right.value : 'Ninguno'}<br>
+                Es hoja: ${(!node.left && !node.right) ? 'Sí' : 'No'}<br>
+                Altura: ${getTreeHeight(node)}
+            `;
+            document.getElementById('node-details').innerHTML = details;
+        }
+
+        const MIN_ZOOM = 0.5;
+        const MAX_ZOOM = 2.5;
+
+        function mouseDragged() {
+            panX += mouseX - pmouseX;
+            panY += mouseY - pmouseY;
+        }
+
+        function mouseWheel(event) {
+            let scaleFactor = 1.1;
+            let newZoom;
+            if (event.delta > 0) {
+                newZoom = zoomLevel / scaleFactor;
+            } else {
+                newZoom = zoomLevel * scaleFactor;
+            }
+
+            // Aplicar límites de zoom
+            zoomLevel = constrain(newZoom, MIN_ZOOM, MAX_ZOOM);
+
+            return false;
+        }
+
+        // Event listeners
+        document.getElementById('btnGenerar').addEventListener('click', generateRandomNumbers);
+        document.getElementById('btnInsertar').addEventListener('click', async () => {
+            const num = parseInt(document.getElementById('numInsertar').value);
+            if (isNaN(num)) {
+                showNotification("Entrada inválida", "Por favor, ingrese un número válido.");
+                return;
+            }
+            await insertNode(num);
+            numbers.push(num);
+            document.getElementById('numerosGenerados').value = numbers.join(', ');
+        });
+        document.getElementById('btnEliminar').addEventListener('click', async () => {
+            const num = parseInt(document.getElementById('numEliminar').value);
+            if (isNaN(num)) {
+                showNotification("Entrada inválida", "Por favor, ingrese un número válido.");
+                return;
+            }
+            await animateDeletion(num);
+            numbers = numbers.filter(n => n !== num);
+            document.getElementById('numerosGenerados').value = numbers.join(', ');
+        });
+        document.getElementById('btnBuscar').addEventListener('click', async () => {
+            const num = parseInt(document.getElementById('numBuscar').value);
+            if (isNaN(num)) {
+                showNotification("Entrada inválida", "Por favor, ingrese un número válido.");
+                return;
+            }
+            await searchInTree(root, num);
+        });
+        document.getElementById('btnAnimateTraversal').addEventListener('click', animateTraversal);
+        document.getElementById('btnLimpiar').addEventListener('click', () => {
+            root = null;
+            numbers = [];
+            document.getElementById('numerosGenerados').value = '';
+            document.getElementById('recorridos').value = '';
+            document.getElementById('output-area').innerHTML = '';
+            updateStats();
+            showNotification("Árbol Limpiado", "El Árbol Binario de Búsqueda ha sido limpiado.");
+        });
+        document.getElementById('btnBalance').addEventListener('click', balanceTree);
+        document.getElementById('speed-slider').addEventListener('input', (e) => {
+            animationSpeed = parseInt(e.target.value);
+        });
+        document.getElementById('zoomIn').addEventListener('click', () => {
+            zoomLevel = constrain(zoomLevel * 1.1, MIN_ZOOM, MAX_ZOOM);
+        });
+
+        document.getElementById('zoomOut').addEventListener('click', () => {
+            zoomLevel = constrain(zoomLevel / 1.1, MIN_ZOOM, MAX_ZOOM);
+        });
+        document.getElementById('resetZoom').addEventListener('click', () => {
+            zoomLevel = 1;
+            panX = 0;
+            panY = 0;
+        });
+
+        // New mouse event listeners for node selection
+        let canvas = document.getElementById('treeCanvas');
+        canvas.addEventListener('click', (event) => {
+            let rect = canvas.getBoundingClientRect();
+            let x = event.clientX - rect.left;
+            let y = event.clientY - rect.top;
+            selectedNode = findClickedNode(root, x, y);
+            showNodeDetails(selectedNode);
+        });
+
+        function findClickedNode(node, x, y) {
+            if (!node) return null;
+            let d = dist(x, y, node.x, node.y);
+            if (d < node.size / 2) {
+                return node;
+            }
+            let leftResult = findClickedNode(node.left, x, y);
+            if (leftResult) return leftResult;
+            return findClickedNode(node.right, x, y);
+        }
+
+        function dist(x1, y1, x2, y2) {
+            return Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+        }
+        function constrain(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+    </script>
+</body>
+
+</html>

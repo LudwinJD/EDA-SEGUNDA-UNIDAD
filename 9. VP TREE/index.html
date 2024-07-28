@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscador Avanzado de Imágenes Similares</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+    <style>
+        .image-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .image-item {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .image-item:hover {
+            transform: scale(1.1);
+        }
+        .selected {
+            border: 3px solid #007bff;
+        }
+        .animate-fade {
+            animation: fadeIn 0.5s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        #debugInfo {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #loadingSpinner {
+            display: none;
+        }
+        .result-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .result-info {
+            margin-left: 10px;
+        }
+        .progress {
+            height: 5px;
+            width: 100px;
+            margin-top: 5px;
+        }
+        .feature-comparison {
+            display: flex;
+            justify-content: space-between;
+        }
+        .feature-column {
+            flex: 1;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Buscador Avanzado de Imágenes Similares</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Cargar Imágenes</h5>
+                        <input type="file" id="imageUpload" class="form-control mb-2" multiple accept="image/*">
+                        <button id="loadRandomImages" class="btn btn-info mb-2"><i class="fas fa-random"></i> Cargar Imágenes Aleatorias</button>
+                        <button id="buildTreeBtn" class="btn btn-primary"><i class="fas fa-tree"></i> Construir Árbol</button>
+                        <div id="loadingSpinner" class="spinner-border text-primary mt-2" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Buscar Imágenes Similares</h5>
+                        <select id="queryImage" class="form-select mb-2">
+                            <option value="">Seleccione una imagen de consulta</option>
+                        </select>
+                        <input id="kInput" type="number" class="form-control mb-2" placeholder="Número de imágenes similares (k)" value="10">
+                        <button id="searchBtn" class="btn btn-success"><i class="fas fa-search"></i> Buscar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Imágenes Cargadas <span id="imageCount" class="badge bg-primary"></span></h5>
+                        <div id="imageContainer" class="image-container"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Resultados de Búsqueda</h5>
+                        <div id="searchResults"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Comparación de Características</h5>
+                        <div class="feature-comparison">
+                            <div class="feature-column">
+                                <h6>Imagen Seleccionada</h6>
+                                <pre id="imageFeatures" class="bg-light p-3 rounded"></pre>
+                            </div>
+                            <div class="feature-column">
+                                <h6>Imagen más cercana</h6>
+                                <pre id="closestImageFeatures1" class="bg-light p-3 rounded"></pre>
+                            </div>
+                            <div class="feature-column">
+                                <h6>Segunda imagen más cercana</h6>
+                                <pre id="closestImageFeatures2" class="bg-light p-3 rounded"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Información de Depuración</h5>
+                        <pre id="debugInfo" class="bg-light p-3 rounded"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class MultiVPTree {
+            constructor(points, numReferences = 2, leafSize = 10) {
+                this.numReferences = numReferences;
+                this.leafSize = leafSize;
+                this.root = this.buildTree(points);
+            }
+
+            buildTree(points) {
+                if (points.length <= this.leafSize) {
+                    return { points: points };
+                }
+
+                const references = [];
+                for (let i = 0; i < this.numReferences; i++) {
+                    references.push(points[Math.floor(Math.random() * points.length)]);
+                }
+
+                const distances = points.map(point => references.map(ref => this.distance(point.features, ref.features)));
+                const medianDistances = references.map((_, i) => this.median(distances.map(d => d[i])));
+
+                const leftPoints = points.filter((_, idx) => distances[idx].every((d, i) => d <= medianDistances[i]));
+                const rightPoints = points.filter((_, idx) => !leftPoints.includes(points[idx]));
+
+                return {
+                    references: references,
+                    medianDistances: medianDistances,
+                    left: this.buildTree(leftPoints),
+                    right: this.buildTree(rightPoints)
+                };
+            }
+
+            search(query, k = 1) {
+                const heap = new MaxHeap();
+                this._search(this.root, query, k, heap);
+                return heap.getSorted();
+            }
+
+            _search(node, query, k, heap) {
+                if (node.points) {
+                    for (const point of node.points) {
+                        const distance = this.distance(query.features, point.features);
+                        if (heap.size() < k || distance < heap.peek().distance) {
+                            heap.push({ point, distance });
+                            if (heap.size() > k) heap.pop();
+                        }
+                    }
+                    return;
+                }
+
+                const queryDistances = node.references.map(ref => this.distance(query.features, ref.features));
+                const exploreLeft = queryDistances.every((d, i) => d <= node.medianDistances[i]);
+
+                const bestBranch = exploreLeft ? node.left : node.right;
+                const otherBranch = exploreLeft ? node.right : node.left;
+
+                this._search(bestBranch, query, k, heap);
+
+                if (heap.size() < k || queryDistances.some((d, i) => d <= node.medianDistances[i] + heap.peek().distance)) {
+                    this._search(otherBranch, query, k, heap);
+                }
+            }
+
+            distance(a, b) {
+                return Math.sqrt(a.reduce((sum, ai, i) => sum + (ai - b[i]) ** 2, 0));
+            }
+
+            median(values) {
+                values.sort((a, b) => a - b);
+                const mid = Math.floor(values.length / 2);
+                return values.length % 2 === 0 ? (values[mid - 1] + values[mid]) / 2 : values[mid];
+            }
+        }
+
+        class MaxHeap {
+            constructor() {
+                this.heap = [];
+            }
+
+            push(element) {
+                this.heap.push(element);
+                this.bubbleUp(this.heap.length - 1);
+            }
+
+            pop() {
+                const max = this.heap[0];
+                const last = this.heap.pop();
+                if (this.heap.length > 0) {
+                    this.heap[0] = last;
+                    this.bubbleDown(0);
+                }
+                return max;
+            }
+
+            peek() {
+                return this.heap[0];
+            }
+
+            size() {
+                return this.heap.length;
+            }
+
+            bubbleUp(index) {
+                while (index > 0) {
+                    const parentIndex = Math.floor((index - 1) / 2);
+                    if (this.heap[parentIndex].distance < this.heap[index].distance) {
+                        [this.heap[parentIndex], this.heap[index]] = [this.heap[index], this.heap[parentIndex]];
+                        index = parentIndex;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            bubbleDown(index) {
+                while (true) {
+                    const leftChild = 2 * index + 1;
+                    const rightChild = 2 * index + 2;
+                    let largest = index;
+
+                    if (leftChild < this.heap.length && this.heap[leftChild].distance > this.heap[largest].distance) {
+                        largest = leftChild;
+                    }
+
+                    if (rightChild < this.heap.length && this.heap[rightChild].distance > this.heap[largest].distance) {
+                        largest = rightChild;
+                    }
+
+                    if (largest !== index) {
+                        [this.heap[index], this.heap[largest]] = [this.heap[largest], this.heap[index]];
+                        index = largest;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            getSorted() {
+                return this.heap.sort((a, b) => a.distance - b.distance);
+            }
+        }
+        
+        let tree;
+        let images = [];
+        let debugInfo = '';
+        let model;
+
+        async function loadModel() {
+            model = await mobilenet.load();
+            addDebugInfo('Modelo MobileNet cargado exitosamente');
+        }
+
+        window.addEventListener('load', async () => {
+            addDebugInfo('Página cargada. Cargando modelo MobileNet...');
+            await loadModel();
+            addDebugInfo('Listo para procesar imágenes.');
+        });
+
+        function addDebugInfo(info) {
+            const debugElement = document.getElementById('debugInfo');
+            debugInfo = info + '\n' + debugInfo;
+            debugElement.textContent = debugInfo;
+            debugElement.scrollTop = 0;
+        }
+
+        async function processImage(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const img = new Image();
+                    img.onload = async () => {
+                        try {
+                            addDebugInfo(`Procesando imagen: ${file.name}`);
+                            const features = await getImageFeatures(img);
+                            const classifications = await classifyImage(img);
+                            addDebugInfo(`Imagen procesada exitosamente: ${file.name}`);
+                            resolve({ file, img, features, classifications });
+                        } catch (error) {
+                            addDebugInfo(`Error al procesar la imagen ${file.name}: ${error.message}`);
+                            reject(error);
+                        }
+                    };
+                    img.onerror = (error) => {
+                        addDebugInfo(`Error al cargar la imagen ${file.name}: ${error.message}`);
+                        reject(new Error(`Error al cargar la imagen ${file.name}`));
+                    };
+                    img.src = e.target.result;
+                };
+                reader.onerror = (error) => {
+                    addDebugInfo(`Error al leer el archivo ${file.name}: ${error.message}`);
+                    reject(new Error(`Error al leer el archivo ${file.name}`));
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function getImageFeatures(img) {
+            const tensor = tf.browser.fromPixels(img).resizeBilinear([224, 224]).toFloat();
+            const normalized = tensor.div(tf.scalar(255));
+            const batched = normalized.expandDims(0);
+            const result = await model.infer(batched, true);
+            return Array.from(result.dataSync());
+        }
+
+        async function classifyImage(img) {
+            const predictions = await model.classify(img);
+            return predictions.map(p => ({ className: p.className, probability: p.probability }));
+        }
+
+        document.getElementById('imageUpload').addEventListener('change', async (e) => {
+            await processUploadedImages(e.target.files);
+        });
+
+        async function processUploadedImages(files) {
+            const container = document.getElementById('imageContainer');
+            const select = document.getElementById('queryImage');
+            container.innerHTML = '';
+            select.innerHTML = '<option value="">Seleccione una imagen de consulta</option>';
+            
+            document.getElementById('loadingSpinner').style.display = 'inline-block';
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                try {
+                    addDebugInfo(`Iniciando procesamiento de ${file.name}`);
+                    const imageData = await processImage(file);
+                    images.push(imageData);
+                    
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(file);
+                    img.className = 'image-item animate-fade';
+                    img.dataset.index = images.length - 1;
+                    img.addEventListener('click', selectImage);
+                    container.appendChild(img);
+
+                    const option = document.createElement('option');
+                    option.value = (images.length - 1).toString();
+                    option.textContent = `Imagen ${images.length}`;
+                    select.appendChild(option);
+
+                    addDebugInfo(`${file.name} procesada y añadida exitosamente`);
+                } catch (error) {
+                    console.error('Error al procesar la imagen:', error);
+                    addDebugInfo(`Error al procesar la imagen ${file.name}: ${error.message}`);
+                    alert(`Error al procesar la imagen: ${file.name}. Consulta la información de depuración para más detalles.`);
+                }
+            }
+            
+            document.getElementById('loadingSpinner').style.display = 'none';
+            updateImageCount();
+        }
+
+        async function loadRandomImages() {
+            const numImages = 20;
+            const imageUrls = [];
+            for (let i = 0; i < numImages; i++) {
+                imageUrls.push(`https://picsum.photos/200/200?random=${Date.now() + i}`);
+            }
+
+            const files = await Promise.all(imageUrls.map(async (url, index) => {
+                const response = await fetch(url);
+                const blob = await response.blob();
+                return new File([blob], `random_image_${index + 1}.jpg`, { type: 'image/jpeg' });
+            }));
+
+            await processUploadedImages(files);
+        }
+
+        document.getElementById('loadRandomImages').addEventListener('click', loadRandomImages);
+
+        function updateImageCount() {
+            const count = images.length;
+            document.getElementById('imageCount').textContent = count;
+        }
+
+        function selectImage(event) {
+            const container = document.getElementById('imageContainer');
+            container.querySelectorAll('.image-item').forEach(img => img.classList.remove('selected'));
+            event.target.classList.add('selected');
+            const index = parseInt(event.target.dataset.index);
+            const imageData = images[index];
+            displayImageFeatures(imageData);
+            document.getElementById('queryImage').value = index.toString();
+        }
+
+        function displayImageFeatures(imageData) {
+            const featuresElement = document.getElementById('imageFeatures');
+            const classificationInfo = imageData.classifications.map(c => `${c.className}: ${(c.probability * 100).toFixed(2)}%`).join('\n');
+            featuresElement.textContent = `Clasificaciones:\n${classificationInfo}\n\nCaracterísticas:\n${JSON.stringify(imageData.features.slice(0, 10), null, 2)}...`;
+            featuresElement.classList.add('animate-fade');
+            setTimeout(() => featuresElement.classList.remove('animate-fade'), 500);
+        }
+
+        document.getElementById('buildTreeBtn').addEventListener('click', () => {
+            if (images.length > 0) {
+                tree = new MultiVPTree(images);
+                alert('Árbol Multi-VP construido con éxito');
+                addDebugInfo(`Árbol Multi-VP construido con ${images.length} imágenes`);
+            } else {
+                alert('Por favor, cargue algunas imágenes primero');
+            }
+        });
+
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            if (!tree) {
+                alert('Por favor, construya el árbol primero');
+                return;
+            }
+
+            const queryIndex = document.getElementById('queryImage').value;
+            const k = parseInt(document.getElementById('kInput').value);
+
+            if (queryIndex === '') {
+                alert('Por favor, seleccione una imagen de consulta');
+                return;
+            }
+
+            const queryImage = images[queryIndex];
+            const results = tree.search(queryImage, k);
+
+            const resultsContainer = document.getElementById('searchResults');
+            resultsContainer.innerHTML = '';
+            results.forEach((result, index) => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item';
+
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(result.point.file);
+                img.className = 'image-item';
+                resultItem.appendChild(img);
+
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'result-info';
+                const topClass = result.point.classifications[0];
+                infoDiv.innerHTML = `
+                    <strong>Imagen ${index + 1}</strong><br>
+                    Distancia: ${result.distance.toFixed(4)}<br>
+                    Principal clase: ${topClass.className} (${(topClass.probability * 100).toFixed(2)}%)<br>
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" style="width: ${100 - (result.distance * 100)}%"></div>
+                    </div>
+                `;
+                resultItem.appendChild(infoDiv);
+
+                resultsContainer.appendChild(resultItem);
+            });
+
+            // Mostrar características de las dos imágenes más cercanas
+            if (results.length >= 1) {
+                const closestFeatures1 = document.getElementById('closestImageFeatures1');
+                closestFeatures1.textContent = `Clasificaciones:\n${results[0].point.classifications.map(c => `${c.className}: ${(c.probability * 100).toFixed(2)}%`).join('\n')}\n\nCaracterísticas:\n${JSON.stringify(results[0].point.features.slice(0, 10), null, 2)}...`;
+            }
+            if (results.length >= 2) {
+                const closestFeatures2 = document.getElementById('closestImageFeatures2');
+                closestFeatures2.textContent = `Clasificaciones:\n${results[1].point.classifications.map(c => `${c.className}: ${(c.probability * 100).toFixed(2)}%`).join('\n')}\n\nCaracterísticas:\n${JSON.stringify(results[1].point.features.slice(0, 10), null, 2)}...`;
+            }
+
+            addDebugInfo(`Búsqueda completada: ${k} imágenes similares encontradas`);
+        });
+    </script>
+</body>
+</html>

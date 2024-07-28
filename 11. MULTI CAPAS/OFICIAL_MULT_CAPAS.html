@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa MULTI CAPAS</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
+    
+    <!-- Leaflet MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css"/>
+    
+    <!-- Leaflet.awesome-markers CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"/>
+    
+    <!-- Leaflet.fullscreen CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.fullscreen/1.6.0/Control.FullScreen.css"/>
+    
+    <!-- Leaflet.MiniMap CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-minimap/3.6.1/Control.MiniMap.min.css"/>
+
+    <!-- Leaflet.measure CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-measure@3.1.0/dist/leaflet-measure.css"/>
+
+    <!-- Leaflet.draw CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+
+    <!-- Leaflet Routing Machine CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    
+    <!-- Custom CSS -->
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .info-panel {
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            max-width: 300px;
+        }
+
+        .info-panel h4 {
+            margin: 0 0 10px;
+            color: #333;
+            font-size: 18px;
+        }
+
+        .custom-button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            transition-duration: 0.4s;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        .custom-button:hover {
+            background-color: #45a049;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 3px 14px rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+        }
+
+        .leaflet-popup-content {
+            margin: 15px;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .legend {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+
+        .leaflet-control-layers {
+            background: #fff;
+            border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+        }
+
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 120px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -60px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .interactive-legend {
+            padding: 10px;
+            background: white;
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .interactive-legend label {
+            margin-left: 5px;
+        }
+
+        .leaflet-control-search {
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+        }
+
+        .leaflet-control-search input {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 5px;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.fullscreen/1.6.0/Control.FullScreen.min.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-minimap/3.6.1/Control.MiniMap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-measure@3.1.0/dist/leaflet-measure.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+    <script>
+        // Initialize map
+        var map = L.map('map', {
+            center: [-15.8402, -70.0219],
+            zoom: 13,
+            zoomControl: false,
+            fullscreenControl: true
+        });
+
+        // Add custom zoom control
+        L.control.zoom({
+            position: 'topright'
+        }).addTo(map);
+
+        // Base layers
+        var baseMaps = {
+            "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }),
+            "Satelite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            })
+        };
+
+        baseMaps["OpenStreetMap"].addTo(map);
+
+        // Layer groups
+        var turisticSites = L.markerClusterGroup();
+        var hotels = L.markerClusterGroup();
+        var restaurants = L.markerClusterGroup();
+        var lakes = L.featureGroup();
+
+        // Custom icons
+        var turisticIcon = L.AwesomeMarkers.icon({
+            icon: 'landmark',
+            prefix: 'fa',
+            markerColor: 'red'
+        });
+
+        var hotelIcon = L.AwesomeMarkers.icon({
+            icon: 'hotel',
+            prefix: 'fa',
+            markerColor: 'blue'
+        });
+
+        var restaurantIcon = L.AwesomeMarkers.icon({
+            icon: 'utensils',
+            prefix: 'fa',
+            markerColor: 'green'
+        });
+
+        // Fetch OSM data using Overpass API
+        function fetchOSMData(query, callback) {
+            var overpassUrl = 'https://overpass-api.de/api/interpreter';
+            var bbox = map.getBounds().getSouth() + ',' + map.getBounds().getWest() + ',' + map.getBounds().getNorth() + ',' + map.getBounds().getEast();
+            var fullQuery = '[out:json][timeout:25];(' + query + '(' + bbox + '););out body;>;out skel qt;';
+
+            fetch(overpassUrl, {
+                method: 'POST',
+                body: 'data=' + encodeURIComponent(fullQuery)
+            })
+                .then(response => response.json())
+                .then(data => callback(data));
+        }
+
+        // Update layers with OSM data
+        function updateLayers() {
+            turisticSites.clearLayers();
+            hotels.clearLayers();
+            restaurants.clearLayers();
+
+            fetchOSMData('node["tourism"="attraction"]', function (data) {
+                data.elements.forEach(element => {
+                    L.marker([element.lat, element.lon], { icon: turisticIcon })
+                        .bindPopup(`<b>${element.tags.name || 'Atracción turística'}</b>`)
+                        .addTo(turisticSites);
+                });
+            });
+
+            fetchOSMData('node["tourism"="hotel"]', function (data) {
+                data.elements.forEach(element => {
+                    L.marker([element.lat, element.lon], { icon: hotelIcon })
+                        .bindPopup(`<b>${element.tags.name || 'Hotel'}</b>`)
+                        .addTo(hotels);
+                });
+            });
+
+            fetchOSMData('node["amenity"="restaurant"]', function (data) {
+                data.elements.forEach(element => {
+                    L.marker([element.lat, element.lon], { icon: restaurantIcon })
+                        .bindPopup(`<b>${element.tags.name || 'Restaurante'}</b>`)
+                        .addTo(restaurants);
+                });
+            });
+        }
+
+        map.on('moveend', updateLayers);
+        updateLayers();
+
+
+        // Add layers to map
+        map.addLayer(turisticSites);
+        map.addLayer(hotels);
+        map.addLayer(restaurants);
+        map.addLayer(lakes);
+
+        // Layer control
+        var overlayMaps = {
+            "Sitios Turísticos": turisticSites,
+            "Hoteles": hotels,
+            "Restaurantes": restaurants,
+            "Lagos": lakes
+        };
+
+        L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+        // Info panel
+        var infoPanel = L.control({ position: 'topright' });
+
+        infoPanel.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'info-panel');
+            this.update();
+            return this._div;
+        };
+
+        infoPanel.update = function (props) {
+            this._div.innerHTML = '<h4>Información de Puno</h4>' + (props ?
+                '<b>' + props.name + '</b><br />' + props.description
+                : 'Seleccione un elemento para ver su información');
+        };
+
+        infoPanel.addTo(map);
+
+        // Custom button for analysis
+        var customControl = L.Control.extend({
+            options: {
+                position: 'topleft'
+            },
+            onAdd: function (map) {
+                var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+                var button = L.DomUtil.create('a', 'custom-button', container);
+                button.innerHTML = 'Analizar';
+
+                L.DomEvent.on(button, 'click', function () {
+                    analyzeData();
+                });
+
+                return container;
+            }
+        });
+
+        map.addControl(new customControl());
+
+        // Data analysis function
+        function analyzeData() {
+            var turisticCount = turisticSites.getLayers().length;
+            var hotelCount = hotels.getLayers().length;
+            var restaurantCount = restaurants.getLayers().length;
+
+            var analysisResults = `
+                <h3>Análisis de Puno</h3>
+                <ul>
+                    <li>Sitios Turísticos: ${turisticCount}</li>
+                    <li>Hoteles: ${hotelCount}</li>
+                    <li>Restaurantes: ${restaurantCount}</li>
+                </ul>
+                <p>Este es un análisis básico basado en los datos disponibles en OpenStreetMap.</p>
+            `;
+
+            L.popup()
+                .setLatLng(map.getCenter())
+                .setContent(analysisResults)
+                .openOn(map);
+        }
+
+        // Legend
+        var legend = L.control({ position: 'bottomright' });
+
+        legend.onAdd = function (map) {
+            var div = L.DomUtil.create('div', 'info legend');
+            var categories = ['Sitios Turísticos', 'Hoteles', 'Restaurantes', 'Lagos'];
+            var colors = ['red', 'blue', 'green', '#3498db'];
+
+            for (var i = 0; i < categories.length; i++) {
+                div.innerHTML +=
+                    '<i style="background:' + colors[i] + '"></i> ' + categories[i] + '<br>';
+            }
+
+            return div;
+        };
+
+        legend.addTo(map);
+
+        // Weather layer (simulated)
+        function addWeatherLayer() {
+            var weatherData = [
+                { lat: -15.8402, lng: -70.0219, temp: 15 },
+                { lat: -15.8300, lng: -70.0100, temp: 14 },
+                { lat: -15.8500, lng: -70.0300, temp: 16 }
+            ];
+
+            var weatherLayer = L.layerGroup();
+
+            weatherData.forEach(point => {
+                L.circle([point.lat, point.lng], {
+                    color: 'red',
+                    fillColor: '#f03',
+                    fillOpacity: 0.5,
+                    radius: 500
+                }).bindPopup(`Temperatura: ${point.temp}°C`).addTo(weatherLayer);
+            });
+
+            map.addLayer(weatherLayer);
+            overlayMaps["Clima"] = weatherLayer;
+            L.control.layers(baseMaps, overlayMaps).remove();
+            L.control.layers(baseMaps, overlayMaps).addTo(map);
+        }
+
+        // Add weather layer button
+        var weatherControl = L.Control.extend({
+            options: {
+                position: 'topleft'
+            },
+            onAdd: function (map) {
+                var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+                var button = L.DomUtil.create('a', 'custom-button', container);
+                button.innerHTML = 'Añadir Clima';
+
+                L.DomEvent.on(button, 'click', function () {
+                    addWeatherLayer();
+                    this.remove();
+                });
+
+                return container;
+            }
+        });
+
+        map.addControl(new weatherControl());
+
+        // Search functionality
+        var searchControl = L.Control.extend({
+            options: {
+                position: 'topright'
+            },
+            onAdd: function (map) {
+                var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-search');
+                var input = L.DomUtil.create('input', '', container);
+                input.type = 'text';
+                input.placeholder = 'Buscar...';
+
+                L.DomEvent.on(input, 'keyup', function (e) {
+                    if (e.keyCode === 13) {
+                        searchLocation(input.value);
+                    }
+                });
+
+                return container;
+            }
+        });
+
+        map.addControl(new searchControl());
+
+        function searchLocation(query) {
+            fetchOSMData(`node["name"~"${query}",i]`, function (data) {
+                if (data.elements.length > 0) {
+                    var result = data.elements[0];
+                    map.setView([result.lat, result.lon], 18);
+                    L.popup()
+                        .setLatLng([result.lat, result.lon])
+                        .setContent(`<b>${result.tags.name}</b>`)
+                        .openOn(map);
+                } else {
+                    alert('No se encontraron resultados para: ' + query);
+                }
+            });
+        }
+
+        // Add route layer
+        var routeControl;
+
+        function addRouteLayer() {
+            if (routeControl) {
+                map.removeControl(routeControl);
+            }
+
+            routeControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(-15.8402, -70.0219), // Plaza de Armas
+                    L.latLng(-15.8283, -70.0197)  // Mirador Kuntur Wasi
+                ],
+                routeWhileDragging: true
+            }).addTo(map);
+        }
+
+        // Route control button
+        var routeControl = L.Control.extend({
+            options: {
+                position: 'topleft'
+            },
+            onAdd: function (map) {
+                var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+                var button = L.DomUtil.create('a', 'custom-button', container);
+                button.innerHTML = 'Mostrar Ruta';
+
+                L.DomEvent.on(button, 'click', function () {
+                    addRouteLayer();
+                });
+
+                return container;
+            }
+        });
+
+        map.addControl(new routeControl());
+
+        // Add heatmap layer
+        function addHeatmapLayer() {
+            fetchOSMData('node["tourism"="attraction"]', function (data) {
+                var heatData = data.elements.map(element => [element.lat, element.lon, 1]);
+
+                var heatmapLayer = L.heatLayer(heatData, {
+                    radius: 25,
+                    blur: 15,
+                    maxZoom: 17,
+                }).addTo(map);
+
+                overlayMaps["Mapa de Calor"] = heatmapLayer;
+                L.control.layers(baseMaps, overlayMaps).remove();
+                L.control.layers(baseMaps, overlayMaps).addTo(map);
+            });
+        }
+
+        // Heatmap control button
+        var heatmapControl = L.Control.extend({
+            options: {
+                position: 'topleft'
+            },
+            onAdd: function (map) {
+                var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+                var button = L.DomUtil.create('a', 'custom-button', container);
+                button.innerHTML = 'Mapa de Calor';
+
+                L.DomEvent.on(button, 'click', function () {
+                    addHeatmapLayer();
+                    this.remove();
+                });
+
+                return container;
+            }
+        });
+
+        map.addControl(new heatmapControl());
+
+        // Add mini-map
+        var miniMap = new L.Control.MiniMap(L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'), {
+            toggleDisplay: true,
+            minimized: false,
+            position: 'bottomleft'
+        }).addTo(map);
+
+        // Add scale control
+        L.control.scale({
+            metric: true,
+            imperial: false,
+            position: 'bottomleft'
+        }).addTo(map);
+
+        // Add copyright information
+        map.attributionControl.addAttribution('Datos © OpenStreetMap contributors, CC-BY-SA');
+
+        // Add measure control
+        var measureControl = new L.Control.Measure({
+            primaryLengthUnit: 'meters',
+            secondaryLengthUnit: 'kilometers',
+            primaryAreaUnit: 'sqmeters',
+            secondaryAreaUnit: 'hectares'
+        });
+        measureControl.addTo(map);
+
+        // Add draw control
+        var drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        var drawControl = new L.Control.Draw({
+            edit: {
+                featureGroup: drawnItems
+            },
+            draw: {
+                polygon: true,
+                polyline: true,
+                rectangle: true,
+                circle: true,
+                marker: true
+            }
+        });
+        map.addControl(drawControl);
+
+        map.on(L.Draw.Event.CREATED, function (event) {
+            var layer = event.layer;
+            drawnItems.addLayer(layer);
+        });
+
+        // Add center control button
+        var centerControl = L.Control.extend({
+            options: {
+                position: 'topleft'
+            },
+            onAdd: function (map) {
+                var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+                var button = L.DomUtil.create('a', 'custom-button', container);
+                button.innerHTML = 'Centrar';
+
+                L.DomEvent.on(button, 'click', function () {
+                    map.setView([-15.8402, -70.0219], 13);
+                });
+
+                return container;
+            }
+        });
+
+        map.addControl(new centerControl());
+
+        // Function to add tooltips to buttons
+        function addTooltip(control, text) {
+            var button = control.getContainer().querySelector('a');
+            button.classList.add('tooltip');
+            var tooltip = L.DomUtil.create('span', 'tooltiptext');
+            tooltip.innerHTML = text;
+            button.appendChild(tooltip);
+        }
+
+        // Add tooltips to controls
+        addTooltip(map.controls.find(control => control instanceof customControl), 'Analizar datos del mapa');
+        addTooltip(map.controls.find(control => control instanceof weatherControl), 'Añadir capa de clima');
+        addTooltip(map.controls.find(control => control instanceof routeControl), 'Mostrar ruta entre puntos');
+        addTooltip(map.controls.find(control => control instanceof heatmapControl), 'Mostrar mapa de calor');
+        addTooltip(map.controls.find(control => control instanceof centerControl), 'Centrar mapa en Puno');
+
+        // Add interactive legend
+        var interactiveLegend = L.control({ position: 'bottomright' });
+
+        interactiveLegend.onAdd = function (map) {
+            var div = L.DomUtil.create('div', 'info legend interactive-legend');
+            var labels = ['Sitios Turísticos', 'Hoteles', 'Restaurantes', 'Lagos'];
+            var layers = [turisticSites, hotels, restaurants, lakes];
+
+            for (var i = 0; i < labels.length; i++) {
+                div.innerHTML +=
+                    '<input type="checkbox" checked id="' + labels[i] + '" onclick="toggleLayer(this, ' + i + ')">' +
+                    '<label for="' + labels[i] + '">' + labels[i] + '</label><br>';
+            }
+
+            return div;
+        };
+
+        interactiveLegend.addTo(map);
+
+        function toggleLayer(checkbox, index) {
+            var layers = [turisticSites, hotels, restaurants, lakes];
+            if (checkbox.checked) {
+                map.addLayer(layers[index]);
+            } else {
+                map.removeLayer(layers[index]);
+            }
+        }
+
+    </script>
+</body>
+</html>
